@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotación de Páginas</title>
+    <style>
+        /* Ajustes de estilo para ocupar toda la pantalla con el iframe */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Contenedor del formulario */
+        #container {
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Estilo del iframe en pantalla completa */
+        #iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none; /* Oculto inicialmente */
+        }
+
+        /* Ocultar el formulario una vez que comienza la rotación */
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script>
+        let urls = [];
+        let index = 0;
+        let intervalId;
+
+        function startRotation() {
+            // Obtener las URLs y el intervalo del formulario
+            const urlsInput = document.getElementById("urls").value.split("\n").map(url => url.trim()).filter(url => url !== "");
+            const intervalInput = parseInt(document.getElementById("interval").value) * 1000; // Convertir a milisegundos
+
+            if (urlsInput.length === 0 || isNaN(intervalInput) || intervalInput <= 0) {
+                alert("Por favor, introduce URLs válidas y un intervalo de tiempo positivo.");
+                return;
+            }
+
+            urls = urlsInput;
+            index = 0;
+
+            // Limpiar cualquier rotación anterior
+            if (intervalId) clearInterval(intervalId);
+
+            // Iniciar la rotación
+            intervalId = setInterval(rotateUrl, intervalInput);
+            rotateUrl(); // Ejecutar la primera rotación inmediatamente
+
+            // Ocultar el formulario y mostrar el iframe en pantalla completa
+            document.getElementById("container").classList.add("hidden");
+            document.getElementById("iframe").style.display = "block";
+        }
+
+        function rotateUrl() {
+            const iframe = document.getElementById("iframe");
+            iframe.src = urls[index];
+            index = (index + 1) % urls.length;
+        }
+    </script>
+</head>
+<body>
+    <div id="container">
+        <h1>Rotación de Páginas Automática</h1>
+        <p>Introduce las URLs (una por línea) y el intervalo de tiempo en segundos:</p>
+
+        <form onsubmit="event.preventDefault(); startRotation();">
+            <label for="urls">URLs (una por línea):</label><br>
+            <textarea id="urls" rows="5" cols="40" placeholder="https://pagina1.com&#10;https://pagina2.com"></textarea><br><br>
+            
+            <label for="interval">Intervalo en segundos:</label><br>
+            <input type="number" id="interval" placeholder="300" min="1"><br><br>
+            
+            <button type="submit">Iniciar Rotación</button>
+        </form>
+    </div>
+
+    <!-- Iframe en pantalla completa -->
+    <iframe id="iframe"></iframe>
+</body>
+</html>

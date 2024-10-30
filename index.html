@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotación de Páginas</title>
+    <title>Rotación de Páginas y Archivos</title>
     <style>
-        /* Ajustes de estilo para ocupar toda la pantalla con el iframe */
         body, html {
             margin: 0;
             padding: 0;
@@ -18,82 +17,173 @@
             overflow: hidden;
         }
 
-        /* Contenedor del formulario */
         #container {
             text-align: center;
             padding: 20px;
         }
 
-        /* Estilo del iframe en pantalla completa */
-        #iframe {
+        #iframe, #image {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             border: none;
-            display: none; /* Oculto inicialmente */
+            display: none;
         }
 
-        /* Ocultar el formulario una vez que comienza la rotación */
+        #image {
+            object-fit: contain;
+            background-color: black;
+        }
+
         .hidden {
             display: none;
+        }
+
+        #savedList {
+            margin-top: 20px;
+            text-align: left;
+            max-height: 150px;
+            overflow-y: auto;
         }
     </style>
     <script>
         let urls = [];
+        let sessionFiles = []; // Archivos subidos solo para la sesión actual
         let index = 0;
         let intervalId;
 
-        function startRotation() {
-            // Obtener las URLs y el intervalo del formulario
-            const urlsInput = document.getElementById("urls").value.split("\n").map(url => url.trim()).filter(url => url !== "");
-            const intervalInput = parseInt(document.getElementById("interval").value) * 1000; // Convertir a milisegundos
+        // Cargar URLs y archivos guardados al cargar la página
+        window.onload = function() {
+            loadSavedItems();
+        };
 
-            if (urlsInput.length === 0 || isNaN(intervalInput) || intervalInput <= 0) {
+        function loadSavedItems() {
+            const savedUrls = JSON.parse(localStorage.getItem("urls")) || [];
+            const savedInterval = localStorage.getItem("interval") || "";
+
+            // Insertar intervalo guardado
+            document.getElementById("interval").value = savedInterval;
+
+            // Mostrar la lista de archivos guardados sin insertar en el textarea
+            const savedList = document.getElementById("savedList");
+            savedList.innerHTML = ""; // Limpiar la lista
+            savedUrls.forEach((item, idx) => {
+                const listItem = document.createElement("div");
+                listItem.textContent = `${item.type === 'url' ? 'URL' : 'Archivo'}: ${item.name || item.url}`;
+                
+                const deleteButton = document.createElement("button");
+                deleteButton.textContent = "Eliminar";
+                deleteButton.style.marginLeft = "10px";
+                deleteButton.onclick = () => deleteItem(idx);
+                
+                listItem.appendChild(deleteButton);
+                savedList.appendChild(listItem);
+            });
+        }
+
+        function startRotation() {
+            const urlsInput = document.getElementById("urls").value.split("\n").map(url => url.trim()).filter(url => url !== "");
+            const intervalInput = parseInt(document.getElementById("interval").value) * 1000;
+
+            // Agregar URLs ingresadas en el textarea a la lista de URLs a rotar
+            urls = urlsInput.map(url => ({ url, type: 'url' }));
+
+            // Agregar los archivos subidos en la sesión actual
+            const fileInput = document.getElementById("fileInput");
+            sessionFiles = [];
+            for (const file of fileInput.files) {
+                const fileURL = URL.createObjectURL(file);
+                sessionFiles.push({ url: fileURL, type: file.type, name: file.name });
+            }
+
+            // Combinar con los elementos guardados en localStorage
+            const savedUrls = JSON.parse(localStorage.getItem("urls")) || [];
+            urls = [...savedUrls, ...urls, ...sessionFiles];
+
+            // Guardar en localStorage solo URLs ingresadas y previamente guardadas, sin los `blob URLs`
+            const storageUrls = [...savedUrls, ...urlsInput.map(url => ({ url, type: 'url' }))];
+            localStorage.setItem("urls", JSON.stringify(storageUrls));
+            localStorage.setItem("interval", document.getElementById("interval").value);
+
+            if (urls.length === 0 || isNaN(intervalInput) || intervalInput <= 0) {
                 alert("Por favor, introduce URLs válidas y un intervalo de tiempo positivo.");
                 return;
             }
 
-            urls = urlsInput;
             index = 0;
 
-            // Limpiar cualquier rotación anterior
             if (intervalId) clearInterval(intervalId);
 
-            // Iniciar la rotación
             intervalId = setInterval(rotateUrl, intervalInput);
-            rotateUrl(); // Ejecutar la primera rotación inmediatamente
+            rotateUrl();
 
-            // Ocultar el formulario y mostrar el iframe en pantalla completa
             document.getElementById("container").classList.add("hidden");
-            document.getElementById("iframe").style.display = "block";
         }
 
         function rotateUrl() {
+            const currentItem = urls[index];
             const iframe = document.getElementById("iframe");
-            iframe.src = urls[index];
+            const image = document.getElementById("image");
+
+            if (currentItem.type === 'url' || currentItem.type === "application/pdf") {
+                iframe.src = currentItem.url;
+                iframe.style.display = "block";
+                image.style.display = "none";
+            } else if (currentItem.type.startsWith("image/")) {
+                image.src = currentItem.url;
+                image.style.display = "block";
+                iframe.style.display = "none";
+            } else {
+                alert("Tipo de archivo no soportado");
+            }
+
             index = (index + 1) % urls.length;
+        }
+
+        function deleteItem(index) {
+            // Cargar la lista actual de localStorage, eliminar el elemento y guardar de nuevo
+            let savedUrls = JSON.parse(localStorage.getItem("urls")) || [];
+            savedUrls.splice(index, 1);
+            localStorage.setItem("urls", JSON.stringify(savedUrls));
+            loadSavedItems(); // Recargar la lista de elementos en la vista
+        }
+
+        function resetLocalStorage() {
+            localStorage.removeItem("urls");
+            localStorage.removeItem("interval");
+            location.reload();
         }
     </script>
 </head>
 <body>
     <div id="container">
-        <h1>Rotación de Páginas Automática</h1>
-        <p>Introduce las URLs (una por línea) y el intervalo de tiempo en segundos:</p>
+        <h1>Rotación de Páginas y Archivos</h1>
+        <p>Introduce URLs (una por línea), selecciona archivos PDF o imágenes, y elige el intervalo de tiempo:</p>
 
         <form onsubmit="event.preventDefault(); startRotation();">
             <label for="urls">URLs (una por línea):</label><br>
             <textarea id="urls" rows="5" cols="40" placeholder="https://pagina1.com&#10;https://pagina2.com"></textarea><br><br>
             
+            <label for="fileInput">Sube archivos (PDF o imágenes):</label><br>
+            <input type="file" id="fileInput" accept=".pdf, .png, .jpg, .jpeg" multiple><br><br>
+
             <label for="interval">Intervalo en segundos:</label><br>
             <input type="number" id="interval" placeholder="300" min="1"><br><br>
             
             <button type="submit">Iniciar Rotación</button>
+            <button type="button" onclick="resetLocalStorage()">Limpiar Todo</button>
         </form>
+
+        <div id="savedList">
+            <h3>Archivos y URLs Guardados:</h3>
+        </div>
     </div>
 
-    <!-- Iframe en pantalla completa -->
+    <!-- Iframe para páginas y PDFs -->
     <iframe id="iframe"></iframe>
+    <!-- Imagen para archivos de imagen -->
+    <img id="image" alt="Visualización de imágenes">
 </body>
 </html>
